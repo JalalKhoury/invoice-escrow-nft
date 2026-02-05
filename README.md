@@ -1,57 +1,169 @@
-# Sample Hardhat 3 Beta Project (`mocha` and `ethers`)
+# Invoice Escrow NFT (Solidity + Hardhat)
 
-This project showcases a Hardhat 3 Beta project using `mocha` for tests and the `ethers` library for Ethereum interactions.
+A smart-contract prototype that turns an **invoice** into an **NFT** and manages its **escrow payment lifecycle on-chain**.  
+Designed for B2B / supply-chain workflows where a buyer wants to pay a supplier with stronger guarantees, transparency, and traceability.
 
-To learn more about the Hardhat 3 Beta, please visit the [Getting Started guide](https://hardhat.org/docs/getting-started#getting-started-with-hardhat-3). To share your feedback, join our [Hardhat 3 Beta](https://hardhat.org/hardhat3-beta-telegram-group) Telegram group or [open an issue](https://github.com/NomicFoundation/hardhat/issues/new) in our GitHub issue tracker.
+> **Use case:** tokenize an invoice (as an NFT), fund escrow, approve/release payment, and keep an immutable audit trail of every step.
 
-## Project Overview
+---
 
-This example project includes:
+## What this project does
 
-- A simple Hardhat configuration file.
-- Foundry-compatible Solidity unit tests.
-- TypeScript integration tests using `mocha` and ethers.js
-- Examples demonstrating how to connect to different types of networks, including locally simulating OP mainnet.
+This repository demonstrates how to represent a real-world business document (**an invoice**) as an on-chain asset (**NFT**) and connect it to an **escrow settlement flow**:
 
-## Usage
+- The **invoice NFT** acts as a unique identifier for an invoice (and its metadata).
+- The **escrow logic** holds payment until approval/verification conditions are met.
+- Events provide an **audit trail** that can be indexed by off-chain tools (dashboards, The Graph, analytics).
 
-### Running Tests
+---
 
-To run all the tests in the project, execute the following command:
+## Why this project exists
 
-```shell
+In traditional supply chain and B2B operations, invoice settlement can suffer from:
+- payment delays and disputes
+- lack of transparent approval trails
+- weak enforcement of milestones / delivery confirmation
+- fragmented audit trails across emails/ERPs
+
+This project demonstrates how **smart contracts** can:
+- create a verifiable invoice record (NFT)
+- lock funds in escrow
+- release funds only when conditions are met (approval / verification)
+- provide an auditable event log for compliance
+
+---
+
+## Core Features
+
+- **Invoice tokenization (NFT)**  
+  Each invoice is represented as a unique token. Metadata can include an invoice reference, amount, due date, and an optional hash/pointer to off-chain documents (ERP reference, IPFS, etc.).
+
+- **Escrow lifecycle**  
+  Buyer funds escrow → authorized party approves/verifies → funds released to supplier (or refunded depending on rules).
+
+- **Role-based access control**  
+  Typical roles: buyer, supplier, (optional) verifier/admin. Roles restrict who can approve, cancel, or release funds.
+
+- **Event-driven audit trail**  
+  Key actions emit events for off-chain indexing and monitoring (minted, funded, approved, released, refunded/cancelled).
+
+- **Test suite**  
+  Unit tests cover common happy-path and failure scenarios.
+
+---
+
+## Project Structure
+
+```text
+invoice-escrow-nft/
+├─ contracts/
+│  ├─ InvoiceEscrowNFT.sol
+│  └─ ... (helpers / interfaces)
+├─ test/
+│  └─ invoice-escrow-nft.spec.ts
+├─ scripts/
+│  └─ deploy.ts
+├─ hardhat.config.ts
+├─ package.json
+└─ README.md
+```
+---
+
+## Smart Contract Overview
+
+> The exact function names and rules depend on the implementation in `InvoiceEscrowNFT.sol`.  
+> This section describes the intended workflow for an invoice escrow NFT system.
+
+### Actors
+- **Buyer**: mints invoice NFTs and funds escrow
+- **Supplier**: receives payment after approval/verification
+- **Verifier/Admin (optional)**: validates delivery/milestones and approves when applicable
+
+### Typical Flow
+1. **Create invoice** → mint an Invoice NFT (links to invoice data/metadata)
+2. **Fund escrow** → buyer deposits the invoice amount into escrow
+3. **Approve / Verify** → buyer or verifier confirms conditions
+4. **Release** → escrow releases funds to supplier (or refunds buyer on cancel/expiry if supported)
+
+---
+
+## Installation
+
+### Requirements
+- Node.js (LTS recommended)
+- npm (or yarn)
+
+### Setup
+```bash
+git clone https://github.com/JalalKhoury/invoice-escrow-nft.git
+cd invoice-escrow-nft
+npm install
+```
+### Compile
+```bash
+npx hardhat compile
+```
+
+### Test
+```bash
 npx hardhat test
 ```
 
-You can also selectively run the Solidity or `mocha` tests:
+### Local Development
 
-```shell
-npx hardhat test solidity
-npx hardhat test mocha
+Start a local Hardhat node
+
+Terminal 1:
+```bash
+npx hardhat node
 ```
 
-### Make a deployment to Sepolia
-
-This project includes an example Ignition module to deploy the contract. You can deploy this module to a locally simulated chain or to Sepolia.
-
-To run the deployment to a local chain:
-
-```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
+Deploy locally (new terminal)
+Terminal 2:
+```bash
+npx hardhat run scripts/deploy.ts --network localhost
 ```
 
-To run the deployment to Sepolia, you need an account with funds to send the transaction. The provided Hardhat configuration includes a Configuration Variable called `SEPOLIA_PRIVATE_KEY`, which you can use to set the private key of the account you want to use.
+## Usage Notes
 
-You can set the `SEPOLIA_PRIVATE_KEY` variable using the `hardhat-keystore` plugin or by setting it as an environment variable.
+- If escrow uses **ETH**, funding is typically done via `msg.value`.
+- If escrow uses an **ERC-20 token** (e.g., USDC on a testnet), you typically:
+  1. approve token allowance to the escrow contract  
+  2. call a funding function that transfers tokens into escrow  
 
-To set the `SEPOLIA_PRIVATE_KEY` config variable using `hardhat-keystore`:
+---
 
-```shell
-npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-```
+## Security Notes (Prototype)
 
-After setting the variable, you can run the deployment with the Sepolia network:
+This repository is a learning + portfolio project. Before production usage, consider:
+- reentrancy protections on payment flows
+- strict access control and role governance
+- safe token transfers (`SafeERC20`) if ERC-20 escrow is used
+- state machine correctness (avoid double-release/double-refund)
+- metadata integrity (hash invoice docs, signatures for approvals)
+- external audit + fuzz testing before real funds are involved
 
-```shell
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
-```
+---
+
+## Roadmap (Optional Improvements)
+
+- Add **ERC-20 escrow** support (e.g., USDC on Sepolia)
+- Add **EIP-712 signatures** for off-chain invoice approvals
+- Add **dispute window / arbitration**
+- Add **milestone-based partial releases**
+- Add **GitHub Actions CI** (tests passing badge)
+
+---
+
+## Author
+
+**Jalal El Khoury**  
+Supply Chain & Operations + Smart Contracts  
+- GitHub: https://github.com/JalalKhoury  
+- Upwork: https://www.upwork.com/freelancers/~01792e1fd403f139ba  
+
+---
+
+## License
+
+MIT
